@@ -1,0 +1,258 @@
+---
+title: "PEC1"
+author: "Tania Perdomo González"
+output:
+  word_document: default
+  pdf_document:
+    latex_engine: pdflatex
+subtitle: "Análisis de datos ómicos"
+---
+
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("SummarizedExperiment")
+```
+
+```{r}
+# Cargamos los datos con los que se va a trabajar
+library(SummarizedExperiment)
+data <- read.csv("~/Dropbox/UOC/SEMESTRE 3/PEC1/PEC1/human_cachexia.csv", header=TRUE)
+
+patient_ids <- data$Patient.ID
+#eliminamos los dos primeras columnas para que todos los datos sean del mismo tipo. 
+data <- data[, -c(1, 2)]
+rownames(data) <- patient_ids
+str(data)
+
+# Creamos el contenedor de los datos cuantitativos y metadatos
+se <- SummarizedExperiment(
+  # Se almacenan los datos experimentales en la lista counts
+  assays = list(counts = data), 
+  # Con Patient.ID se relaciona cada muestra con su identificador
+  rowData = DataFrame(Patient.ID = rownames(data)),
+  # Se relaciona cada columna con un parámetro. 
+  colData = DataFrame(Metabolite = colnames(data))
+)
+
+#Añadimos información general sobre el dataset como su nombre o contenido. 
+metadata(se) <- list(
+    title = "Human Caquexia Dataset",
+    description = "Dataset con niveles de metabolitos de pacientes cachexicos y no cachexicos (grupo control)."
+)
+
+se
+summary(se)
+#Guardamos el dataset en formato binario. 
+save(se, file = "human_caquexia.Rda")
+# Aplicamos distintas herramientas para comprobar que el contenedor está correctamente implementado: 
+num_samples <- nrow(se)
+num_metabolites <- length(unique(colnames(se)))
+missing_values <- sum(is.na(se))
+
+rownames(se)
+colnames(se)
+metadata(se)
+dim(se)
+ncol(se)
+
+
+class(se)
+sapply(assays(se), class)
+
+
+assays(se)
+assayNames(se)
+head(assay(se, "counts"))
+
+colData(se)
+rowData(se)
+
+```
+
+```{r}
+# Análisis exploratorio de los datos
+# Análisis univariante
+data2 <- read.csv("~/Dropbox/UOC/SEMESTRE 3/PEC1/PEC1/human_cachexia.csv", header=TRUE)
+unique(data2$Muscle.loss)
+data2$Muscle.loss <- as.factor(data2$Muscle.loss)
+dim(data)
+names(data)
+round(apply(data,2, summary))
+summary(data2)
+str(data2)
+
+opt <- par(mfrow = c(3, 3))
+for (i in 1:ncol(data))
+  hist(data[,i], main = names(data)[i])
+par(opt)
+
+#Comparación de metabolitos entre grupos:
+par(mfrow = c(1, 2))
+boxplot(data2$X1.6.Anhydro.beta.D.glucose ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "6.Anhydro.beta.D.glucose")
+
+boxplot(data2$X1.Methylnicotinamide ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Methylnicotinamide")
+
+
+
+par(mfrow = c(1, 3))
+
+boxplot(data2$X2.Aminobutyrate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Aminobutyrate")
+
+boxplot(data2$X2.Hydroxyisobutyrate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Hydroxyisobutyrate")
+
+
+boxplot(data2$X2.Oxoglutarate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Oxoglutarate")
+
+
+
+par(mfrow = c(1, 3))
+
+boxplot(data2$X3.Aminoisobutyrate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Aminoisobutyrate")
+
+boxplot(data2$X3.Hydroxybutyrate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Hydroxybutyrate")
+
+boxplot(data2$X3.Hydroxyisovalerate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Hydroxyisovalerate")
+
+par(mfrow = c(1, 2))
+boxplot(data2$X3.Indoxylsulfate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Indoxylsulfate")
+
+
+boxplot(data2$X4.Hydroxyphenylacetate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Hydroxyphenylacetate")
+
+
+
+
+```
+
+
+```{r}
+
+#Análisis multivarinate de datos (PCA y agrupación jerárquica)
+library(ggplot2)  
+library(dplyr) 
+library(viridis)
+
+grupos <- unique(data2$Patient.ID)
+groupColors <- viridis(length(grupos))
+names(groupColors) <- grupos
+
+print(groupColors)
+
+pca<-prcomp(t(data), scale=TRUE)
+loads<- round(pca$sdev^2/sum(pca$sdev^2)*100,1)
+
+xlab<-c(paste("PC1",loads[1],"%"))
+ylab<-c(paste("PC2",loads[2],"%"))
+plot(pca$x[,1:2],xlab=xlab,ylab=ylab, col=groupColors, 
+     main ="Principal components (PCA)")
+
+names2plot <- rownames(data)
+x <- as.data.frame(t(data)) 
+colnames(x) <- names2plot
+clust.euclid.average <- hclust(dist(t(x)),method="average")
+plot(clust.euclid.average, hang=-1,cex = 0.5, lwd = 0.5)
+
+
+names2plot <- rownames(data)
+x <- as.data.frame(data) 
+clust.euclid.average <- hclust(dist(t(x)),method="average")
+plot(clust.euclid.average, hang=-1 ,cex = 0.5, lwd = 0.5)
+
+
+par(mfrow = c(1, 2))
+boxplot(data2$Creatinine ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Creatinine")
+
+boxplot(data2$Hippurate ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Hippurate")
+
+
+boxplot(data2$Isoleucine ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Isoleucine")
+
+boxplot(data2$Tyrosine ~ data2$Muscle.loss,
+col = c("skyblue", "lightgreen"),
+legend = c("Control", "Caquexia"),
+xlab = "Group",
+ylab = "Tyrosine")
+
+#Perfil de aminoácidos en ambos grupos de estudio (sólo se seleccionan las columnas correspondientes a aminoácidos)
+
+library(ggplot2)
+library(tidyr)
+
+data_subset <- data2[, c("Muscle.loss", names(data2)[16:17],names(data2)[30],names(data2)[34],names(data2)[36], names(data2)[38:39],names(data2)[48],names(data2)[53], names(data2)[56:59])] 
+
+
+data_long <- pivot_longer(data_subset, 
+                           cols = -Muscle.loss, 
+                           names_to = "Aminoacido", 
+                           values_to = "Valor")
+
+
+ggplot(data_long, aes(x = factor(Muscle.loss), y = Valor, fill = Aminoacido)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Niveles de aminoácidos por grupo de estudio",
+       x = "Grupo", 
+       y = "Niveles") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+```
+
+
+
+
